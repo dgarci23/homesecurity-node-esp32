@@ -16,6 +16,7 @@
 
 // Set your Board ID (ESP32 Sender #1 = BOARD_ID 1, ESP32 Sender #2 = BOARD_ID 2, etc)
 #define BOARD_ID 1
+#define WIFI_SSID "ND-guest" 
 
 //MAC Address of the receiver 
 uint8_t broadcastAddress[] = {0x8C, 0x4B, 0x14, 0x9F, 0x03, 0xD4};
@@ -24,9 +25,6 @@ uint8_t broadcastAddress[] = {0x8C, 0x4B, 0x14, 0x9F, 0x03, 0xD4};
 //Must match the receiver structure
 typedef struct struct_message {
     int id;
-    float temp;
-    float hum;
-    int readingId;
 } struct_message;
 
 //Create a struct_message called myData
@@ -34,11 +32,6 @@ struct_message myData;
 
 unsigned long previousMillis = 0;   // Stores last time temperature was published
 const long interval = 10000;        // Interval at which to publish sensor readings
-
-unsigned int readingId = 0;
-
-// Insert your SSID
-constexpr char WIFI_SSID[] = "ND-guest";
 
 int32_t getWiFiChannel(const char *ssid) {
   if (int32_t n = WiFi.scanNetworks()) {
@@ -49,36 +42,6 @@ int32_t getWiFiChannel(const char *ssid) {
       }
   }
   return 0;
-}
-
-float readDHTTemperature() {
-  // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
-  // Read temperature as Celsius (the default)
-  float t = 10.0f;
-  // Read temperature as Fahrenheit (isFahrenheit = true)
-  //float t = dht.readTemperature(true);
-  // Check if any reads failed and exit early (to try again).
-  if (isnan(t)) {    
-    Serial.println("Failed to read from DHT sensor!");
-    return 0;
-  }
-  else {
-    Serial.println(t);
-    return t;
-  }
-}
-
-float readDHTHumidity() {
-  // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
-  float h = 20.0f;
-  if (isnan(h)) {
-    Serial.println("Failed to read from DHT sensor!");
-    return 0;
-  }
-  else {
-    Serial.println(h);
-    return h;
-  }
 }
 
 // callback when data is sent
@@ -103,11 +66,6 @@ void setup() {
   esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
   esp_wifi_set_promiscuous(false);
   WiFi.printDiag(Serial); // Uncomment to verify channel change after
-
-  Serial.print("Station IP Address: ");
-  Serial.println(WiFi.localIP());
-  Serial.print("Wi-Fi Channel: ");
-  Serial.println(WiFi.channel());
 
   //Init ESP-NOW
   if (esp_now_init() != ESP_OK) {
@@ -138,9 +96,6 @@ void loop() {
     previousMillis = currentMillis;
     //Set values to send
     myData.id = BOARD_ID;
-    myData.temp = readDHTTemperature();
-    myData.hum = readDHTHumidity();
-    myData.readingId = readingId++;
      
     //Send message via ESP-NOW
     esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &myData, sizeof(myData));
