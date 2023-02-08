@@ -17,21 +17,22 @@
 // Set your Board ID (ESP32 Sender #1 = BOARD_ID 1, ESP32 Sender #2 = BOARD_ID 2, etc)
 #define BOARD_ID 1
 #define WIFI_SSID "ND-guest" 
+#define MAC_ADDR {0x8C, 0x4B, 0x14, 0x9F, 0x03, 0xD4}
 
 //MAC Address of the receiver 
-uint8_t broadcastAddress[] = {0x8C, 0x4B, 0x14, 0x9F, 0x03, 0xD4};
+uint8_t broadcastAddress[] = MAC_ADDR;
 
 //Structure example to send data
 //Must match the receiver structure
 typedef struct struct_message {
     int id;
+    int value;
 } struct_message;
 
 //Create a struct_message called myData
 struct_message myData;
 
-unsigned long previousMillis = 0;   // Stores last time temperature was published
-const long interval = 10000;        // Interval at which to publish sensor readings
+esp_now_peer_info_t peerInfo;
 
 int32_t getWiFiChannel(const char *ssid) {
   if (int32_t n = WiFi.scanNetworks()) {
@@ -50,8 +51,6 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
 }
 
-esp_now_peer_info_t peerInfo;
- 
 void setup() {
   //Init Serial Monitor
   Serial.begin(115200);
@@ -87,23 +86,20 @@ void setup() {
     Serial.println("Failed to add peer");
     return;
   }
-}
- 
-void loop() {
-  unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= interval) {
-    // Save the last time a new reading was published
-    previousMillis = currentMillis;
-    //Set values to send
-    myData.id = BOARD_ID;
+  myData.id = BOARD_ID;
+  myData.value = random(0,50);
      
-    //Send message via ESP-NOW
-    esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &myData, sizeof(myData));
-    if (result == ESP_OK) {
-      Serial.println("Sent with success");
-    }
-    else {
-      Serial.println("Error sending the data");
-    }
+  //Send message via ESP-NOW
+  esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &myData, sizeof(myData));
+  if (result == ESP_OK) {
+    Serial.println("Sent with success");
+    esp_sleep_enable_ext0_wakeup(GPIO_NUM_2,1);
+    Serial.println("Going to sleep now");
+    esp_deep_sleep_start();
   }
+  else {
+    Serial.println("Error sending the data");
+  }
+} 
+void loop() {
 }
