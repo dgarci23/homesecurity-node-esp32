@@ -22,6 +22,7 @@
 //MAC Address of the receiver 
 uint8_t broadcastAddress[6];
 uint8_t board_id;
+String ssid;
 
 //Structure example to send data
 //Must match the receiver structure
@@ -35,10 +36,10 @@ struct_message myData;
 
 esp_now_peer_info_t peerInfo;
 
-int32_t getWiFiChannel(const char *ssid) {
+int32_t getWiFiChannel() {
   if (int32_t n = WiFi.scanNetworks()) {
       for (uint8_t i=0; i<n; i++) {
-          if (!strcmp(ssid, WiFi.SSID(i).c_str())) {
+          if (ssid == WiFi.SSID(i)) {
               return WiFi.channel(i);
           }
       }
@@ -55,11 +56,12 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   esp_deep_sleep_start();
 }
 
-void getMACAddress(uint8_t broadcastAddress[], uint8_t &board_id) {
+void getMACAddress() {
   for (int i = 0; i < 6; i++){
     broadcastAddress[i] = EEPROM.read(i);
   }
   board_id = EEPROM.read(6);
+  ssid = EEPROM.readString(7);
 }
 
 void saveInitialConfig() {
@@ -72,6 +74,8 @@ void saveInitialConfig() {
   EEPROM.write(5, 0xD4);
   // ID
   EEPROM.write(6, BOARD_ID);
+  // SSID
+  EEPROM.writeString(7, WIFI_SSID);
   EEPROM.commit();
   Serial.println("Configuration data persisted.");
 }
@@ -80,17 +84,17 @@ void setup() {
   //Init Serial Monitor
   Serial.begin(115200);
 
-  EEPROM.begin(7);
+  EEPROM.begin(40);
 
   if (esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_EXT0){
     saveInitialConfig();
   }
 
-  getMACAddress(broadcastAddress, board_id);
+  getMACAddress();
   // Set device as a Wi-Fi Station and set channel
   WiFi.mode(WIFI_STA);
 
-  int32_t channel = getWiFiChannel(WIFI_SSID);
+  int32_t channel = getWiFiChannel();
 
   //WiFi.printDiag(Serial); // Uncomment to verify channel number before
   esp_wifi_set_promiscuous(true);
