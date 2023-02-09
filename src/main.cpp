@@ -18,7 +18,6 @@
 // Set your Board ID (ESP32 Sender #1 = BOARD_ID 1, ESP32 Sender #2 = BOARD_ID 2, etc)
 #define BOARD_ID 1
 #define WIFI_SSID "ND-guest" 
-#define MAC_ADDR {0x8C, 0x4B, 0x14, 0x9F, 0x03, 0xD4}
 
 //MAC Address of the receiver 
 uint8_t broadcastAddress[6];
@@ -58,13 +57,16 @@ void getMACAddress(uint8_t broadcastAddress[]) {
   }
 }
 
-void saveMACAddress() {
+void saveInitialConfig() {
+  // MAC Address
   EEPROM.write(0, 0x8C);
   EEPROM.write(1, 0x4B);
   EEPROM.write(2, 0x14);
   EEPROM.write(3, 0x9F);
   EEPROM.write(4, 0x03);
   EEPROM.write(5, 0xD4);
+  // ID
+  EEPROM.write(6, BOARD_ID);
   EEPROM.commit();
   Serial.println("Device MAC address persisted.");
 }
