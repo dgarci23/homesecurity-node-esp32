@@ -21,6 +21,7 @@
 
 //MAC Address of the receiver 
 uint8_t broadcastAddress[6];
+uint8_t board_id;
 
 //Structure example to send data
 //Must match the receiver structure
@@ -49,12 +50,16 @@ int32_t getWiFiChannel(const char *ssid) {
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   Serial.print("\r\nLast Packet Send Status:\t");
   Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_2,1);
+  Serial.println("Going to sleep now");
+  esp_deep_sleep_start();
 }
 
-void getMACAddress(uint8_t broadcastAddress[]) {
+void getMACAddress(uint8_t broadcastAddress[], uint8_t &board_id) {
   for (int i = 0; i < 6; i++){
     broadcastAddress[i] = EEPROM.read(i);
   }
+  board_id = EEPROM.read(6);
 }
 
 void saveInitialConfig() {
@@ -68,30 +73,30 @@ void saveInitialConfig() {
   // ID
   EEPROM.write(6, BOARD_ID);
   EEPROM.commit();
-  Serial.println("Device MAC address persisted.");
+  Serial.println("Configuration data persisted.");
 }
 
 void setup() {
   //Init Serial Monitor
   Serial.begin(115200);
 
-  EEPROM.begin(6);
+  EEPROM.begin(7);
 
-  if (esp_sleep_wakeup_cause_t() != ESP_SLEEP_WAKEUP_EXT0){
-    saveMACAddress();
+  if (esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_EXT0){
+    saveInitialConfig();
   }
 
-  getMACAddress(broadcastAddress);
+  getMACAddress(broadcastAddress, board_id);
   // Set device as a Wi-Fi Station and set channel
   WiFi.mode(WIFI_STA);
 
   int32_t channel = getWiFiChannel(WIFI_SSID);
 
-  WiFi.printDiag(Serial); // Uncomment to verify channel number before
+  //WiFi.printDiag(Serial); // Uncomment to verify channel number before
   esp_wifi_set_promiscuous(true);
   esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
   esp_wifi_set_promiscuous(false);
-  WiFi.printDiag(Serial); // Uncomment to verify channel change after
+  //WiFi.printDiag(Serial); // Uncomment to verify channel change after
 
   //Init ESP-NOW
   if (esp_now_init() != ESP_OK) {
@@ -113,16 +118,14 @@ void setup() {
     Serial.println("Failed to add peer");
     return;
   }
-  myData.id = BOARD_ID;
+  myData.id = board_id;
   myData.value = random(0,50);
      
   //Send message via ESP-NOW
   esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &myData, sizeof(myData));
   if (result == ESP_OK) {
     Serial.println("Sent with success");
-    esp_sleep_enable_ext0_wakeup(GPIO_NUM_2,1);
-    Serial.println("Going to sleep now");
-    esp_deep_sleep_start();
+    
   }
   else {
     Serial.println("Error sending the data");
