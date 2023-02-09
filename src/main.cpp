@@ -13,6 +13,7 @@
 #include <esp_now.h>
 #include <esp_wifi.h>
 #include <WiFi.h>
+#include <EEPROM.h>
 
 // Set your Board ID (ESP32 Sender #1 = BOARD_ID 1, ESP32 Sender #2 = BOARD_ID 2, etc)
 #define BOARD_ID 1
@@ -20,7 +21,7 @@
 #define MAC_ADDR {0x8C, 0x4B, 0x14, 0x9F, 0x03, 0xD4}
 
 //MAC Address of the receiver 
-uint8_t broadcastAddress[] = MAC_ADDR;
+uint8_t broadcastAddress[6];
 
 //Structure example to send data
 //Must match the receiver structure
@@ -51,10 +52,34 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
 }
 
+void getMACAddress(uint8_t broadcastAddress[]) {
+  for (int i = 0; i < 6; i++){
+    broadcastAddress[i] = EEPROM.read(i);
+  }
+}
+
+void saveMACAddress() {
+  EEPROM.write(0, 0x8C);
+  EEPROM.write(1, 0x4B);
+  EEPROM.write(2, 0x14);
+  EEPROM.write(3, 0x9F);
+  EEPROM.write(4, 0x03);
+  EEPROM.write(5, 0xD4);
+  EEPROM.commit();
+  Serial.println("Device MAC address persisted.");
+}
+
 void setup() {
   //Init Serial Monitor
   Serial.begin(115200);
 
+  EEPROM.begin(6);
+
+  if (esp_sleep_wakeup_cause_t() != ESP_SLEEP_WAKEUP_EXT0){
+    saveMACAddress();
+  }
+
+  getMACAddress(broadcastAddress);
   // Set device as a Wi-Fi Station and set channel
   WiFi.mode(WIFI_STA);
 
