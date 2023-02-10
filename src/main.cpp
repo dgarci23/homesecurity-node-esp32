@@ -1,21 +1,9 @@
-/*
-  Rui Santos
-  Complete project details at https://RandomNerdTutorials.com/esp32-esp-now-wi-fi-web-server/
-  
-  Permission is hereby granted, free of charge, to any person obtaining a copy
-  of this software and associated documentation files.
-  
-  The above copyright notice and this permission notice shall be included in all
-  copies or substantial portions of the Software.
-*/
-
 #include <Arduino.h>
 #include <esp_now.h>
 #include <esp_wifi.h>
 #include <WiFi.h>
 #include <EEPROM.h>
 
-// Set your Board ID (ESP32 Sender #1 = BOARD_ID 1, ESP32 Sender #2 = BOARD_ID 2, etc)
 #define BOARD_ID 1
 #define WIFI_SSID "ND-guest" 
 
@@ -56,7 +44,7 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   esp_deep_sleep_start();
 }
 
-void getMACAddress() {
+void getConfig() {
   for (int i = 0; i < 6; i++){
     broadcastAddress[i] = EEPROM.read(i);
   }
@@ -90,7 +78,7 @@ void setup() {
     saveInitialConfig();
   }
 
-  getMACAddress();
+  getConfig();
   // Set device as a Wi-Fi Station and set channel
   WiFi.mode(WIFI_STA);
 
