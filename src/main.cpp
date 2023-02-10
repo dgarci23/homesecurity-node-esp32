@@ -7,6 +7,8 @@
 #define BOARD_ID 1
 #define WIFI_SSID "ND-guest" 
 
+#define MAGNET 0
+
 //MAC Address of the receiver 
 uint8_t broadcastAddress[6];
 uint8_t board_id;
@@ -39,7 +41,7 @@ int32_t getWiFiChannel() {
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   Serial.print("\r\nLast Packet Send Status:\t");
   Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
-  esp_sleep_enable_ext0_wakeup(GPIO_NUM_2,1);
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_2, MAGNET);
   Serial.println("Going to sleep now");
   esp_deep_sleep_start();
 }
