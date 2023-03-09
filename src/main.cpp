@@ -15,6 +15,12 @@ uint8_t broadcastAddress[6];
 uint8_t board_id;
 String ssid;
 
+// Performance measurements
+int t_total;
+int t_eeprom;
+int t_channel_sel;
+int t_espnow;
+
 //Structure example to send data
 //Must match the receiver structure
 typedef struct struct_message {
@@ -29,13 +35,22 @@ esp_now_peer_info_t peerInfo;
 
 int32_t getWiFiChannel() {
   if (int32_t n = WiFi.scanNetworks()) {
-      for (uint8_t i=0; i<n; i++) {
-          if (ssid == WiFi.SSID(i)) {
-              return WiFi.channel(i);
-          }
-      }
+    for (uint8_t i=0; i<n; i++) {
+        if (ssid == WiFi.SSID(i)) {
+            return WiFi.channel(i);
+        }
+    }
   }
   return 0;
+}
+
+void printPerformance() {
+  Serial.printf("------ PERFORMANCE RESULTS ------\n");
+  Serial.printf("Total Latency: %d\n", t_total);
+  Serial.printf("   EEPROM Latency: %d\n", t_eeprom);
+  Serial.printf("   Channel Selection Latency: %d\n", t_channel_sel);
+  Serial.printf("   ESP NOW Latency: %d\n", t_espnow);
+  Serial.printf("---------------------------------\n");
 }
 
 // callback when data is sent
@@ -44,6 +59,9 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
   esp_sleep_enable_ext0_wakeup(GPIO_NUM_2, MOVEMENT);
   Serial.println("Going to sleep now");
+  t_total = millis() - t_total;
+  t_espnow = millis() - t_espnow;
+  printPerformance();
   esp_deep_sleep_start();
 }
 
@@ -71,7 +89,14 @@ void saveInitialConfig() {
   Serial.println("Configuration data persisted.");
 }
 
+
+
 void setup() {
+  t_total = millis();
+
+  pinMode(25, OUTPUT);
+  digitalWrite(25, HIGH);
+
   //Init Serial Monitor
   Serial.begin(115200);
 
@@ -81,11 +106,16 @@ void setup() {
     saveInitialConfig();
   }
 
+  t_eeprom = millis();
   getConfig();
+  t_eeprom = millis() - t_eeprom;
+
   // Set device as a Wi-Fi Station and set channel
   WiFi.mode(WIFI_STA);
 
+  t_channel_sel = millis();
   int32_t channel = getWiFiChannel();
+  t_channel_sel = millis() - t_channel_sel;
 
   //WiFi.printDiag(Serial); // Uncomment to verify channel number before
   esp_wifi_set_promiscuous(true);
@@ -93,6 +123,7 @@ void setup() {
   esp_wifi_set_promiscuous(false);
   //WiFi.printDiag(Serial); // Uncomment to verify channel change after
 
+  t_espnow = millis();
   //Init ESP-NOW
   if (esp_now_init() != ESP_OK) {
     Serial.println("Error initializing ESP-NOW");
