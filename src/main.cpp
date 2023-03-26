@@ -25,7 +25,7 @@ int t_espnow;
 //Must match the receiver structure
 typedef struct struct_message {
     int id;
-    int value;
+    bool battery;
 } struct_message;
 
 //Create a struct_message called myData
@@ -47,8 +47,6 @@ int32_t getWiFiChannel() {
 void printPerformance() {
   Serial.printf("------ PERFORMANCE RESULTS ------\n");
   Serial.printf("Total Latency: %d\n", t_total);
-  Serial.printf("   EEPROM Latency: %d\n", t_eeprom);
-  Serial.printf("   Channel Selection Latency: %d\n", t_channel_sel);
   Serial.printf("   ESP NOW Latency: %d\n", t_espnow);
   Serial.printf("---------------------------------\n");
 }
@@ -58,6 +56,7 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   Serial.print("\r\nLast Packet Send Status:\t");
   Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
   esp_sleep_enable_ext0_wakeup(GPIO_NUM_2, MOVEMENT);
+  esp_sleep_enable_timer_wakeup(5*1000000);
   Serial.println("Going to sleep now");
   t_total = millis() - t_total;
   t_espnow = millis() - t_espnow;
@@ -89,39 +88,10 @@ void saveInitialConfig() {
   Serial.println("Configuration data persisted.");
 }
 
-
-
-void setup() {
-  t_total = millis();
-
-  pinMode(25, OUTPUT);
-  digitalWrite(25, HIGH);
-
-  //Init Serial Monitor
-  Serial.begin(115200);
-
-  EEPROM.begin(40);
-
-  if (esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_EXT0){
-    saveInitialConfig();
-  }
-
-  t_eeprom = millis();
-  getConfig();
-  t_eeprom = millis() - t_eeprom;
-
+void sendStatus() {
+  
   // Set device as a Wi-Fi Station and set channel
   WiFi.mode(WIFI_STA);
-
-  t_channel_sel = millis();
-  int32_t channel = getWiFiChannel();
-  t_channel_sel = millis() - t_channel_sel;
-
-  //WiFi.printDiag(Serial); // Uncomment to verify channel number before
-  esp_wifi_set_promiscuous(true);
-  esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
-  esp_wifi_set_promiscuous(false);
-  //WiFi.printDiag(Serial); // Uncomment to verify channel change after
 
   t_espnow = millis();
   //Init ESP-NOW
@@ -130,12 +100,9 @@ void setup() {
     return;
   }
 
-  // Once ESPNow is successfully Init, we will register for Send CB to
-  // get the status of Trasnmitted packet
   esp_now_register_send_cb(OnDataSent);
   
   //Register peer
-  //esp_now_peer_info_t peerInfo;
   memcpy(peerInfo.peer_addr, broadcastAddress, 6);
   peerInfo.encrypt = false;
   
@@ -144,18 +111,56 @@ void setup() {
     Serial.println("Failed to add peer");
     return;
   }
-  myData.id = board_id;
-  myData.value = random(0,50);
-     
+    
   //Send message via ESP-NOW
   esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &myData, sizeof(myData));
   if (result == ESP_OK) {
     Serial.println("Sent with success");
-    
-  }
-  else {
+  } else {
     Serial.println("Error sending the data");
   }
+}
+
+void setup() {
+  t_total = millis();
+
+  pinMode(25, OUTPUT);
+  digitalWrite(25, HIGH);
+
+  Serial.begin(115200);
+  EEPROM.begin(40);
+  
+  if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_TIMER) {
+    float battery_v = (float)analogRead(36)*3.3/4096;
+    Serial.printf("Battery Voltage Read: %f\n", battery_v);
+    if (battery_v < 1.55) {
+      getConfig();
+      myData.id = board_id;
+      myData.battery = false;
+      sendStatus();
+    } else {
+      esp_sleep_enable_ext0_wakeup(GPIO_NUM_2, MOVEMENT);
+      esp_sleep_enable_timer_wakeup(5*1000000);
+      esp_deep_sleep_start();
+    }
+    return;
+  }
+
+  if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0) {
+    getConfig();
+    myData.id = board_id;
+    myData.battery = true;
+    sendStatus();
+
+    return;
+  }
+
+  saveInitialConfig();
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_2, MOVEMENT);
+  esp_sleep_enable_timer_wakeup(5*1000000);
+  esp_deep_sleep_start();
+
+  return;
 } 
 void loop() {
 }
